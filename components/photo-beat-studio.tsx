@@ -20,6 +20,29 @@ import { validateAudioFile, validatePhotoFile } from "@/lib/local-media";
 import { cn } from "@/lib/utils";
 
 const ORIGINAL_AUDIO_URL = "/sample/original-spark.wav";
+// 采样用的工作分辨率：96 列网格下每格约 4px，够均色用
+const PORTRAIT_SAMPLE_EDGE = 384;
+
+async function decodePortraitImage(photoObjectUrl: string): Promise<ImageData> {
+  const image = new window.Image();
+  image.src = photoObjectUrl;
+  await image.decode();
+
+  const scale = Math.min(
+    1,
+    PORTRAIT_SAMPLE_EDGE / Math.max(image.naturalWidth, image.naturalHeight),
+  );
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas 2D is unavailable.");
+  context.drawImage(image, 0, 0, width, height);
+  return context.getImageData(0, 0, width, height);
+}
 
 export function PhotoBeatStudio() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -31,6 +54,7 @@ export function PhotoBeatStudio() {
   const audioSourceRef = useRef<string | null>(ORIGINAL_AUDIO_URL);
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [portraitImage, setPortraitImage] = useState<ImageData | null>(null);
   const [photoReady, setPhotoReady] = useState(false);
   const [photoName, setPhotoName] = useState("");
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -107,6 +131,17 @@ export function PhotoBeatStudio() {
     setPhotoName(file.name);
     setPhotoReady(false);
     setPhotoError(null);
+
+    setPortraitImage(null);
+    void decodePortraitImage(nextPhotoUrl)
+      .then((imageData) => {
+        // 用户可能已经换了下一张照片，旧结果直接丢弃
+        if (photoObjectUrlRef.current === nextPhotoUrl) setPortraitImage(imageData);
+      })
+      .catch(() => {
+        // 采样失败只降级为无溶解效果，不阻塞播放
+        if (photoObjectUrlRef.current === nextPhotoUrl) setPortraitImage(null);
+      });
   };
 
   const handleAudioChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -239,6 +274,7 @@ export function PhotoBeatStudio() {
       {photoUrl ? (
         <BeatVisualizer
           photoUrl={photoUrl}
+          portraitImage={portraitImage}
           audioRef={audioRef}
           isPlaying={isPlaying}
           readFrame={readFrame}

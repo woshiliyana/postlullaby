@@ -108,5 +108,11 @@ export function sampleParticles(
     selected = qualified;
   }
 
-  return selected.map(({ qualified: _qualified, ...particle }) => particle);
+  return selected.map((cell) => ({
+    homeX: cell.homeX,
+    homeY: cell.homeY,
+    color: cell.color,
+    size: cell.size,
+    luminance: cell.luminance,
+  }));
 }
