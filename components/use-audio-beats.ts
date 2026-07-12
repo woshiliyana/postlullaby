@@ -20,6 +20,29 @@ const EMPTY_FRAME: AudioEnergyFrame = {
   intensity: 0,
 };
 
+const AUDIO_ENGINE_INITIALIZATION_ERROR_CODE = "AUDIO_ENGINE_INITIALIZATION_FAILED";
+
+export class AudioEngineInitializationError extends Error {
+  readonly code = AUDIO_ENGINE_INITIALIZATION_ERROR_CODE;
+
+  constructor(cause: unknown) {
+    super("The audio engine could not be initialized.", { cause });
+    this.name = "AudioEngineInitializationError";
+  }
+}
+
+export function isAudioEngineInitializationError(
+  error: unknown,
+): error is AudioEngineInitializationError {
+  return error instanceof AudioEngineInitializationError
+    || (
+      typeof error === "object"
+      && error !== null
+      && "code" in error
+      && error.code === AUDIO_ENGINE_INITIALIZATION_ERROR_CODE
+    );
+}
+
 export function useAudioBeats(audioRef: RefObject<HTMLAudioElement | null>): {
   resume: () => Promise<void>;
   readFrame: () => AudioEnergyFrame;
@@ -57,7 +80,7 @@ export function useAudioBeats(audioRef: RefObject<HTMLAudioElement | null>): {
         const analyser = context.createAnalyser();
         analyserRef.current = analyser;
         analyser.fftSize = 2_048;
-        analyser.smoothingTimeConstant = 0.72;
+        analyser.smoothingTimeConstant = 0;
 
         const mediaSource = context.createMediaElementSource(audio);
         mediaSourceRef.current = mediaSource;
@@ -66,9 +89,7 @@ export function useAudioBeats(audioRef: RefObject<HTMLAudioElement | null>): {
 
         frequencyBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
       } catch (initializationError) {
-        const failure = initializationError instanceof Error
-          ? initializationError
-          : new Error("The audio engine could not be initialized.");
+        const failure = new AudioEngineInitializationError(initializationError);
         initializationFailureRef.current = failure;
 
         mediaSourceRef.current?.disconnect();

@@ -2,6 +2,8 @@
 
 A browser-only prototype for testing whether one photo reacting to one song creates a compelling memorial-video moment.
 
+**Original Spark** is the 15-second test scene. **Your Song** plays the selected local track in full in the current browser; this spike does not export a video.
+
 ## Run locally
 
 ```bash

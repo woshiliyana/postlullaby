@@ -6,7 +6,7 @@
 
 Before building the full memorial-song pipeline, validate the product's visual “wow” moment with the smallest possible interactive prototype.
 
-The spike turns one pet or person photo into a 15-second, music-reactive scene. It supports one bundled original sample and one locally selected song. A commercial song such as “Gee” is never bundled, downloaded, uploaded, or committed by the app; the user may select a legally obtained local copy, and analysis stays in the browser.
+The spike turns one pet or person photo into a music-reactive scene. **Original Spark** is a 15-second bundled sample; **Your Song** plays the selected local track in full for browser testing. A commercial song such as “Gee” is never bundled, downloaded, uploaded, or committed by the app; the user may select a legally obtained local copy, and analysis stays in the browser. This spike has no export.
 
 The existing memorial MVP specification remains preserved, but its implementation is paused until this spike is evaluated. The spike does not claim that the product direction has permanently changed.
 

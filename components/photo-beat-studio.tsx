@@ -12,8 +12,12 @@ import {
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { BeatVisualizer } from "@/components/beat-visualizer";
-import { useAudioBeats } from "@/components/use-audio-beats";
+import {
+  isAudioEngineInitializationError,
+  useAudioBeats,
+} from "@/components/use-audio-beats";
 import { validateAudioFile, validatePhotoFile } from "@/lib/local-media";
+import { cn } from "@/lib/utils";
 
 const ORIGINAL_AUDIO_URL = "/sample/original-spark.wav";
 
@@ -172,10 +176,14 @@ export function PhotoBeatStudio() {
       if (!isCurrentAttempt()) return;
       setHasEntered(true);
       setIsPlaying(true);
-    } catch {
+    } catch (error) {
       if (!isCurrentAttempt()) return;
       setIsPlaying(false);
-      setAudioError("Playback couldn’t start. Try pressing play again.");
+      setAudioError(
+        isAudioEngineInitializationError(error)
+          ? "The audio engine couldn’t start. Reload this page to try again."
+          : "Playback couldn’t start. Try pressing play again.",
+      );
     }
   };
 
@@ -215,15 +223,19 @@ export function PhotoBeatStudio() {
       if (!isCurrentAttempt()) return;
       setHasEntered(true);
       setIsPlaying(true);
-    } catch {
+    } catch (error) {
       if (!isCurrentAttempt()) return;
       setIsPlaying(false);
-      setAudioError("Replay couldn’t start. Try pressing replay again.");
+      setAudioError(
+        isAudioEngineInitializationError(error)
+          ? "The audio engine couldn’t start. Reload this page to try again."
+          : "Replay couldn’t start. Try pressing replay again.",
+      );
     }
   };
 
   return (
-    <main className={`studio-shell${photoUrl ? " studio-shell--loaded" : ""}`}>
+    <main className={cn("studio-shell", photoUrl && "studio-shell--loaded")}>
       {photoUrl ? (
         <BeatVisualizer
           photoUrl={photoUrl}
@@ -289,7 +301,7 @@ export function PhotoBeatStudio() {
           <div className="track-picker__options">
             <button
               type="button"
-              className={audioMode === "original" ? "track-option is-active" : "track-option"}
+              className={cn("track-option", audioMode === "original" && "is-active")}
               aria-pressed={audioMode === "original"}
               onClick={chooseOriginal}
             >
@@ -298,7 +310,7 @@ export function PhotoBeatStudio() {
             </button>
             <button
               type="button"
-              className={audioMode === "local" ? "track-option is-active" : "track-option"}
+              className={cn("track-option", audioMode === "local" && "is-active")}
               aria-pressed={audioMode === "local"}
               onClick={chooseLocal}
             >
@@ -326,7 +338,7 @@ export function PhotoBeatStudio() {
         {audioError ? <p className="field-error" role="alert">{audioError}</p> : null}
 
         <div className="now-playing" aria-live="polite">
-          <span className={isPlaying ? "equalizer is-playing" : "equalizer"} aria-hidden="true">
+          <span className={cn("equalizer", isPlaying && "is-playing")} aria-hidden="true">
             <i /><i /><i /><i />
           </span>
           <span><small>NOW CUED</small><strong title={trackName}>{trackName}</strong></span>
