@@ -23,25 +23,27 @@ const ORIGINAL_AUDIO_URL = "/sample/original-spark.wav";
 // 采样用的工作分辨率：96 列网格下每格约 4px，够均色用
 const PORTRAIT_SAMPLE_EDGE = 384;
 
-async function decodePortraitImage(photoObjectUrl: string): Promise<ImageData> {
-  const image = new window.Image();
-  image.src = photoObjectUrl;
-  await image.decode();
+async function decodePortraitImage(file: File): Promise<ImageData> {
+  // 直接从 File 解码：blob URL + Image.decode() 在部分 Chromium 环境会挂起
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(
+      1,
+      PORTRAIT_SAMPLE_EDGE / Math.max(bitmap.width, bitmap.height),
+    );
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
 
-  const scale = Math.min(
-    1,
-    PORTRAIT_SAMPLE_EDGE / Math.max(image.naturalWidth, image.naturalHeight),
-  );
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas 2D is unavailable.");
-  context.drawImage(image, 0, 0, width, height);
-  return context.getImageData(0, 0, width, height);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas 2D is unavailable.");
+    context.drawImage(bitmap, 0, 0, width, height);
+    return context.getImageData(0, 0, width, height);
+  } finally {
+    bitmap.close();
+  }
 }
 
 export function PhotoBeatStudio() {
@@ -133,13 +135,16 @@ export function PhotoBeatStudio() {
     setPhotoError(null);
 
     setPortraitImage(null);
-    void decodePortraitImage(nextPhotoUrl)
+    void decodePortraitImage(file)
       .then((imageData) => {
         // 用户可能已经换了下一张照片，旧结果直接丢弃
-        if (photoObjectUrlRef.current === nextPhotoUrl) setPortraitImage(imageData);
+        if (photoObjectUrlRef.current !== nextPhotoUrl) return;
+        setPortraitImage(imageData);
+        // 解码成功即证明照片可显示；next/image 的 onLoad 对 blob URL 不可靠
+        setPhotoReady(true);
       })
       .catch(() => {
-        // 采样失败只降级为无溶解效果，不阻塞播放
+        // 采样失败只降级为无溶解效果，可播放性交回 onLoad/onError 决定
         if (photoObjectUrlRef.current === nextPhotoUrl) setPortraitImage(null);
       });
   };
@@ -405,6 +410,11 @@ export function PhotoBeatStudio() {
         src={audioSource ?? undefined}
         preload="auto"
         onCanPlay={() => setAudioReady(true)}
+        onPlay={() => {
+          // 兜底外部播放来源（OS 媒体键等），让舞台跟着动
+          setHasEntered(true);
+          setIsPlaying(true);
+        }}
         onPause={() => setIsPlaying(false)}
         onEnded={() => setIsPlaying(false)}
         onError={() => {

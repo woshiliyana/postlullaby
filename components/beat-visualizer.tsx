@@ -109,6 +109,10 @@ export function BeatVisualizer({
 
     // object-fit: contain 的实际内容区域，粒子必须画在这里才能和照片无缝衔接
     const measureContentRect = () => {
+      // 不依赖 onLoad 回调拿引用：已缓存图片可能不触发 onLoad
+      if (!photoRef.current || !photoRef.current.isConnected) {
+        photoRef.current = root.querySelector<HTMLImageElement>("img.visual-stage__photo");
+      }
       const photo = photoRef.current;
       if (!photo || !photo.naturalWidth || !photo.naturalHeight) return null;
       const box = photo.getBoundingClientRect();
