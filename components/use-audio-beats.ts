@@ -30,35 +30,69 @@ export function useAudioBeats(audioRef: RefObject<HTMLAudioElement | null>): {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const frequencyBufferRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const detectorRef = useRef(createBeatDetector());
+  const initializationAttemptedRef = useRef(false);
+  const initializationFailureRef = useRef<Error | null>(null);
+  const contextClosePromiseRef = useRef<Promise<void> | null>(null);
+
+  const closeContextOnce = useCallback((context: AudioContext) => {
+    if (!contextClosePromiseRef.current) {
+      contextClosePromiseRef.current = context.state === "closed" ? Promise.resolve() : context.close();
+    }
+    return contextClosePromiseRef.current;
+  }, []);
 
   const resume = useCallback(async () => {
+    if (initializationFailureRef.current) throw initializationFailureRef.current;
+
     const audio = audioRef.current;
     if (!audio) throw new Error("The audio player is not ready.");
 
     let context = audioContextRef.current;
-    if (!context) {
-      context = new AudioContext();
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 2_048;
-      analyser.smoothingTimeConstant = 0.72;
-
+    if (!initializationAttemptedRef.current) {
+      initializationAttemptedRef.current = true;
       try {
+        context = new AudioContext();
+        audioContextRef.current = context;
+
+        const analyser = context.createAnalyser();
+        analyserRef.current = analyser;
+        analyser.fftSize = 2_048;
+        analyser.smoothingTimeConstant = 0.72;
+
         const mediaSource = context.createMediaElementSource(audio);
+        mediaSourceRef.current = mediaSource;
         mediaSource.connect(analyser);
         analyser.connect(context.destination);
 
-        audioContextRef.current = context;
-        mediaSourceRef.current = mediaSource;
-        analyserRef.current = analyser;
         frequencyBufferRef.current = new Uint8Array(analyser.frequencyBinCount);
-      } catch (error) {
-        await context.close();
-        throw error;
+      } catch (initializationError) {
+        const failure = initializationError instanceof Error
+          ? initializationError
+          : new Error("The audio engine could not be initialized.");
+        initializationFailureRef.current = failure;
+
+        mediaSourceRef.current?.disconnect();
+        analyserRef.current?.disconnect();
+        mediaSourceRef.current = null;
+        analyserRef.current = null;
+        frequencyBufferRef.current = null;
+
+        if (context) {
+          try {
+            await closeContextOnce(context);
+          } catch (closeError) {
+            const closeMessage = closeError instanceof Error ? closeError.message : String(closeError);
+            failure.message = `${failure.message} Audio engine cleanup also failed: ${closeMessage}`;
+          }
+        }
+
+        throw failure;
       }
     }
 
+    if (!context) throw new Error("The audio engine initialization did not create a context.");
     if (context.state === "suspended") await context.resume();
-  }, [audioRef]);
+  }, [audioRef, closeContextOnce]);
 
   const readFrame = useCallback((): AudioEnergyFrame => {
     const analyser = analyserRef.current;
@@ -104,9 +138,9 @@ export function useAudioBeats(audioRef: RefObject<HTMLAudioElement | null>): {
       frequencyBufferRef.current = null;
       detector.reset();
 
-      if (context && context.state !== "closed") void context.close();
+      if (context) void closeContextOnce(context);
     };
-  }, []);
+  }, [closeContextOnce]);
 
   return { resume, readFrame, reset };
 }

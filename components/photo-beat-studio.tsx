@@ -9,7 +9,7 @@ import {
   RefreshCcw,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { BeatVisualizer } from "@/components/beat-visualizer";
 import { useAudioBeats } from "@/components/use-audio-beats";
@@ -23,6 +23,8 @@ export function PhotoBeatStudio() {
   const audioInputRef = useRef<HTMLInputElement>(null);
   const photoObjectUrlRef = useRef<string | null>(null);
   const audioObjectUrlRef = useRef<string | null>(null);
+  const playbackAttemptRef = useRef(0);
+  const audioSourceRef = useRef<string | null>(ORIGINAL_AUDIO_URL);
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoReady, setPhotoReady] = useState(false);
@@ -41,10 +43,16 @@ export function PhotoBeatStudio() {
   const trackName = audioMode === "original" ? "Original Spark" : localAudioName || "Choose a local song";
   const canPlay = Boolean(photoUrl && photoReady && audioSource && audioReady);
 
+  const invalidatePlaybackAttempt = useCallback(() => {
+    playbackAttemptRef.current += 1;
+  }, []);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
+    audioSourceRef.current = audioSource;
+    invalidatePlaybackAttempt();
     audio.pause();
     audio.currentTime = 0;
     reset();
@@ -53,16 +61,18 @@ export function PhotoBeatStudio() {
     setAudioReady(false);
     setAudioError(null);
     audio.load();
-  }, [audioSource, reset]);
+  }, [audioSource, invalidatePlaybackAttempt, reset]);
 
   useEffect(() => {
     return () => {
+      invalidatePlaybackAttempt();
       if (photoObjectUrlRef.current) URL.revokeObjectURL(photoObjectUrlRef.current);
       if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
     };
-  }, []);
+  }, [invalidatePlaybackAttempt]);
 
   const stopAndReset = () => {
+    invalidatePlaybackAttempt();
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -125,11 +135,13 @@ export function PhotoBeatStudio() {
   };
 
   const chooseOriginal = () => {
+    invalidatePlaybackAttempt();
     setAudioMode("original");
     setAudioError(null);
   };
 
   const chooseLocal = () => {
+    invalidatePlaybackAttempt();
     setAudioMode("local");
     setAudioError(null);
     if (!localAudioUrl) audioInputRef.current?.click();
@@ -139,6 +151,15 @@ export function PhotoBeatStudio() {
     const audio = audioRef.current;
     if (!audio || !canPlay) return;
 
+    const attempt = playbackAttemptRef.current + 1;
+    playbackAttemptRef.current = attempt;
+    const source = audioSource;
+    const isCurrentAttempt = () => (
+      playbackAttemptRef.current === attempt
+      && audioRef.current === audio
+      && audioSourceRef.current === source
+    );
+
     setAudioError(null);
     try {
       if (audio.ended) {
@@ -146,16 +167,20 @@ export function PhotoBeatStudio() {
         reset();
       }
       await resume();
+      if (!isCurrentAttempt()) return;
       await audio.play();
+      if (!isCurrentAttempt()) return;
       setHasEntered(true);
       setIsPlaying(true);
     } catch {
+      if (!isCurrentAttempt()) return;
       setIsPlaying(false);
       setAudioError("Playback couldn’t start. Try pressing play again.");
     }
   };
 
   const pause = () => {
+    invalidatePlaybackAttempt();
     audioRef.current?.pause();
     setIsPlaying(false);
   };
@@ -174,12 +199,24 @@ export function PhotoBeatStudio() {
     reset();
     setAudioError(null);
 
+    const attempt = playbackAttemptRef.current + 1;
+    playbackAttemptRef.current = attempt;
+    const source = audioSource;
+    const isCurrentAttempt = () => (
+      playbackAttemptRef.current === attempt
+      && audioRef.current === audio
+      && audioSourceRef.current === source
+    );
+
     try {
       await resume();
+      if (!isCurrentAttempt()) return;
       await audio.play();
+      if (!isCurrentAttempt()) return;
       setHasEntered(true);
       setIsPlaying(true);
     } catch {
+      if (!isCurrentAttempt()) return;
       setIsPlaying(false);
       setAudioError("Replay couldn’t start. Try pressing replay again.");
     }
@@ -320,7 +357,6 @@ export function PhotoBeatStudio() {
         src={audioSource ?? undefined}
         preload="auto"
         onCanPlay={() => setAudioReady(true)}
-        onPlaying={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={() => setIsPlaying(false)}
         onError={() => {
