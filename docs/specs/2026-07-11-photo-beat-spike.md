@@ -6,7 +6,9 @@
 
 Before building the full memorial-song pipeline, validate the product's visual “wow” moment with the smallest possible interactive prototype.
 
-The spike turns one pet or person photo into a 15-second, music-reactive scene. It supports one bundled original sample and one locally selected song. A commercial song such as “Gee” is never bundled, downloaded, uploaded, or committed by the app; the user may select a legally obtained local copy, and analysis stays in the browser.
+The spike turns one pet or person photo into a music-reactive scene. **Original Spark** is a 15-second bundled sample; a small **bundled track library** offers a few longer royalty-free songs with real drum content for a fuller preview; **Your Song** plays the selected local track in full for browser testing. A commercial song such as “Gee” is never bundled, downloaded, uploaded, or committed by the app; the user may select a legally obtained local copy, and analysis stays in the browser. This spike has no export.
+
+Every bundled library track must carry a verifiable royalty-free or CC0-equivalent license (e.g. Pixabay License) confirmed at download time, with its source URL, license, and artist recorded in `public/sample/library/LICENSES.md`. A track is added to the repository only after its license and audio content have both been independently confirmed — filename alone is not sufficient confirmation, since a filename can be wrong or misleading.
 
 The existing memorial MVP specification remains preserved, but its implementation is paused until this spike is evaluated. The spike does not claim that the product direction has permanently changed.
 
@@ -21,15 +23,16 @@ The prototype should feel understandable without instructions and visibly exciti
 ### Inputs
 
 - One JPEG, PNG, or WebP photo of a pet or person, selected locally.
-- One of two music sources:
+- One of three music sources:
   - **Original Spark:** a bundled, original 15-second Y2K pop sample created for the prototype.
+  - **Library tracks:** a small, fixed set of bundled royalty-free songs (license recorded per track) offering a fuller, real-drum preview beyond Original Spark's 15 seconds.
   - **Your Song:** one browser-supported local audio file selected by the user.
 
 ### Flow
 
 1. The page opens directly on a photo drop zone with the product promise.
 2. The visitor selects a photo and immediately sees a preview.
-3. The visitor keeps **Original Spark** or selects **Your Song**.
+3. The visitor keeps **Original Spark**, picks a **library track**, or selects **Your Song**.
 4. One primary button starts playback and switches into the visual stage.
 5. Pause, replay, choose another photo, and choose another song remain available.
 
@@ -64,6 +67,8 @@ Suggested ownership boundaries:
 - `components/use-audio-beats.ts`: Web Audio setup, normalized energy, beat events, pause/resume, and cleanup.
 - `scripts/make-original-sample.mjs`: reproducibly generates the original prototype track.
 - `public/sample/original-spark.wav`: bundled original 15-second sample.
+- `public/sample/library/`: bundled royalty-free library tracks, trimmed to a preview length.
+- `public/sample/library/LICENSES.md`: source URL, license, and artist for every bundled library track.
 
 ## Error handling
 
@@ -75,6 +80,7 @@ Suggested ownership boundaries:
 ## Acceptance criteria
 
 - [ ] A first-time visitor can select a photo and start the bundled sample without instructions.
+- [ ] Each bundled library track has a confirmed royalty-free license recorded in `public/sample/library/LICENSES.md`, verified against the track's actual audio content and metadata, not just its filename.
 - [ ] A user can select a legally obtained local audio file and see the same visual stage respond to it.
 - [ ] Neither the photo nor local audio produces a network request.
 - [ ] The four acts play in order: untouched photo, dissolve into a recognizable particle portrait, beat-driven breathing and flashes, and a return to the untouched photo.

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run --exclude '.worktrees/**'",
+    "typecheck": "tsc --noEmit",
+    "make:sample": "node scripts/make-original-sample.mjs",
+    "verify": "npm test && npm run lint -- --ignore-pattern '.worktrees/**' && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

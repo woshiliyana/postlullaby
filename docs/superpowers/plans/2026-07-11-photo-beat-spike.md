@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a browser-only prototype that turns one local pet or person photo into a 15-second beat-reactive scene using either a bundled original track or a locally selected song.
+**Goal:** Build a browser-only prototype that turns one local pet or person photo into a beat-reactive scene using either the bundled 15-second Original Spark track or a locally selected song that plays in full in the current browser. The spike has no export.
 
 **Architecture:** `app/page.tsx` remains a Server Component and renders one focused Client Component. Pure local-media validation and beat detection live under `lib/` and are unit tested; one Web Audio hook owns a single `AudioContext`/`AnalyserNode`, while a visual component uses CSS variables plus Canvas without causing React renders on every animation frame. User files stay in browser object URLs and no API route is added.
 
