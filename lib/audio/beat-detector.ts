@@ -1,14 +1,24 @@
 export type BeatFrame = { beat: boolean; intensity: number };
 
 const WARMUP_DURATION_MS = 300;
-const BASELINE_TIME_CONSTANT_MS = 650;
 const ONSET_WINDOW_MS = 120;
 const BEAT_COOLDOWN_MS = 180;
-const MINIMUM_BEAT_ENERGY = 0.24;
-const MINIMUM_ENERGY_RISE = 0.08;
-const MINIMUM_ONSET_RISE = 0.06;
-const RELATIVE_ENERGY_RISE = 0.12;
-const REARM_ENERGY_DROP = 0.08;
+// How far back "recent" reaches when measuring the track's own current
+// dynamic range. Long enough to span a full beat cycle at slow tempos,
+// short enough to still describe "right now" rather than the whole song.
+const RANGE_WINDOW_MS = 900;
+// A beat needs the energy to clear this fraction of the track's own recent
+// min-max swing above its recent floor, and to have risen by this fraction
+// since the local onset window's low point. Sizing both thresholds off the
+// track's own recent range (rather than an absolute level, or a level
+// relative to a slow rolling average) is what lets this work for both a
+// sparse, high-dynamic-range synthetic kick and a loud, compressed
+// commercial master whose low-band energy never dips far from its own peak.
+const THRESHOLD_RANGE_FRACTION = 0.45;
+const ONSET_RISE_RANGE_FRACTION = 0.25;
+const REARM_DROP_RANGE_FRACTION = 0.3;
+// Floors so a near-silent passage (recent range ~0) can't spuriously "beat".
+const ABSOLUTE_FLOOR = 0.03;
 
 type EnergySample = {
   atMs: number;
@@ -16,32 +26,41 @@ type EnergySample = {
 };
 
 export function createBeatDetector() {
-  let average = 0;
   let warmupStartedAt: number | null = null;
-  let previousSampleAt: number | null = null;
   let lastBeatAt = Number.NEGATIVE_INFINITY;
   let armed = true;
   let latchedPeak = 0;
   let onsetWindow: EnergySample[] = [];
+  let rangeWindow: EnergySample[] = [];
 
   return {
     sample(lowEnergy: number, nowMs: number): BeatFrame {
       const energy = Math.min(1, Math.max(0, lowEnergy));
 
-      if (warmupStartedAt === null || previousSampleAt === null) {
-        average = energy;
+      if (warmupStartedAt === null) {
         warmupStartedAt = nowMs;
-        previousSampleAt = nowMs;
         onsetWindow = [{ atMs: nowMs, energy }];
+        rangeWindow = [{ atMs: nowMs, energy }];
         return { beat: false, intensity: 0 };
       }
 
-      const elapsedMs = Math.max(0, nowMs - previousSampleAt);
-      previousSampleAt = nowMs;
+      rangeWindow.push({ atMs: nowMs, energy });
+      const rangeStartsAt = nowMs - RANGE_WINDOW_MS;
+      while (rangeWindow.length > 1 && rangeWindow[0].atMs < rangeStartsAt) {
+        rangeWindow.shift();
+      }
+      let recentMin = energy;
+      let recentMax = energy;
+      for (const sample of rangeWindow) {
+        recentMin = Math.min(recentMin, sample.energy);
+        recentMax = Math.max(recentMax, sample.energy);
+      }
+      const recentRange = recentMax - recentMin;
 
       if (!armed) {
         latchedPeak = Math.max(latchedPeak, energy);
-        if (latchedPeak - energy >= REARM_ENERGY_DROP) {
+        const rearmDrop = Math.max(ABSOLUTE_FLOOR, recentRange * REARM_DROP_RANGE_FRACTION);
+        if (latchedPeak - energy >= rearmDrop) {
           armed = true;
           onsetWindow = [{ atMs: nowMs, energy }];
         }
@@ -56,12 +75,12 @@ export function createBeatDetector() {
       let onsetReference = energy;
       for (const sample of onsetWindow) onsetReference = Math.min(onsetReference, sample.energy);
 
-      const adaptiveMargin = Math.max(MINIMUM_ENERGY_RISE, average * RELATIVE_ENERGY_RISE);
-      const threshold = Math.max(MINIMUM_BEAT_ENERGY, average + adaptiveMargin);
+      const threshold = recentMin + Math.max(ABSOLUTE_FLOOR, recentRange * THRESHOLD_RANGE_FRACTION);
+      const onsetRiseThreshold = Math.max(ABSOLUTE_FLOOR, recentRange * ONSET_RISE_RANGE_FRACTION);
       const warmedUp = nowMs - warmupStartedAt >= WARMUP_DURATION_MS;
       const beat = armed
         && warmedUp
-        && energy - onsetReference >= MINIMUM_ONSET_RISE
+        && energy - onsetReference >= onsetRiseThreshold
         && energy > threshold
         && nowMs - lastBeatAt >= BEAT_COOLDOWN_MS;
 
@@ -71,19 +90,19 @@ export function createBeatDetector() {
         lastBeatAt = nowMs;
       }
 
-      const baselineAlpha = 1 - Math.exp(-elapsedMs / BASELINE_TIME_CONSTANT_MS);
-      average += (energy - average) * baselineAlpha;
+      const intensity = beat
+        ? Math.min(1, (energy - threshold) / Math.max(0.05, recentRange) + 0.35)
+        : 0;
 
-      return { beat, intensity: beat ? Math.min(1, (energy - threshold) / 0.5 + 0.35) : 0 };
+      return { beat, intensity };
     },
     reset() {
-      average = 0;
       warmupStartedAt = null;
-      previousSampleAt = null;
       lastBeatAt = Number.NEGATIVE_INFINITY;
       armed = true;
       latchedPeak = 0;
       onsetWindow = [];
+      rangeWindow = [];
     },
   };
 }

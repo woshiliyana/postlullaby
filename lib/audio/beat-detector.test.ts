@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createBeatDetector } from "./beat-detector";
+import {
+  REAL_TRACK_ENERGY_FIXTURE,
+  REAL_TRACK_ENERGY_FIXTURE_CADENCE_MS,
+} from "./beat-detector.fixtures";
 
 const FRAME_CADENCES_MS = [8, 16, 33, 50] as const;
 
@@ -86,5 +90,36 @@ describe("createBeatDetector", () => {
     detector.reset();
 
     expect(detector.sample(0.9, 1_000).beat).toBe(false);
+  });
+
+  it("keeps tracking a loud, compressed real track without multi-beat silent gaps", () => {
+    // Recorded from an actual bundled library track: a real four-on-the-floor
+    // dance mix whose low-band energy sits high and close to its own peak
+    // throughout (a compressed master), unlike Original Spark's very sparse,
+    // high-dynamic-range synthetic kick. The track keeps a steady beat every
+    // ~400-500ms the whole time; a detector anchored to an absolute rolling
+    // average (rather than the track's own recent local range) can go over a
+    // second without registering a single beat here even though the music
+    // never stops.
+    const detector = createBeatDetector();
+    const beatTimesMs: number[] = [];
+
+    REAL_TRACK_ENERGY_FIXTURE.forEach((energy, index) => {
+      const nowMs = index * REAL_TRACK_ENERGY_FIXTURE_CADENCE_MS;
+      if (detector.sample(energy, nowMs).beat) beatTimesMs.push(nowMs);
+    });
+
+    const totalDurationMs =
+      (REAL_TRACK_ENERGY_FIXTURE.length - 1) * REAL_TRACK_ENERGY_FIXTURE_CADENCE_MS;
+    const gapsMs = [
+      beatTimesMs[0] ?? totalDurationMs,
+      ...beatTimesMs.slice(1).map((atMs, index) => atMs - beatTimesMs[index]),
+      totalDurationMs - (beatTimesMs.at(-1) ?? 0),
+    ];
+
+    // The real track's own audio never has a rhythmic gap this long; a
+    // detector gap this long means real beats were missed, not that the
+    // track went quiet.
+    expect(Math.max(...gapsMs)).toBeLessThan(700);
   });
 });
