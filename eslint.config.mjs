@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Isolated feature worktrees carry their own .next build cache; ESLint's
+    // ignore globs aren't recursive by default, so this needs its own entry.
+    ".worktrees/**",
   ]),
 ]);
 

@@ -19,7 +19,7 @@ import {
 import { validateAudioFile, validatePhotoFile } from "@/lib/local-media";
 import { cn } from "@/lib/utils";
 
-const ORIGINAL_AUDIO_URL = "/sample/original-spark.wav";
+const ORIGINAL_AUDIO_URL = "/sample/original-spark.mp3";
 
 const LIBRARY_TRACKS = [
   {

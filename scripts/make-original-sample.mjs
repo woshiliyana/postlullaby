@@ -77,3 +77,7 @@ for (let index = 0; index < frameCount; index += 1) {
 await mkdir(new URL("../public/sample/", import.meta.url), { recursive: true });
 await writeFile(new URL("../public/sample/original-spark.wav", import.meta.url), wavBuffer);
 console.log("Created public/sample/original-spark.wav (15s, original, 132 BPM)");
+console.log(
+  "Compress before committing, e.g.: ffmpeg -i public/sample/original-spark.wav " +
+    "-codec:a libmp3lame -b:a 128k public/sample/original-spark.mp3",
+);
