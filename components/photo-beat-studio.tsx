@@ -20,6 +20,15 @@ import { validateAudioFile, validatePhotoFile } from "@/lib/local-media";
 import { cn } from "@/lib/utils";
 
 const ORIGINAL_AUDIO_URL = "/sample/original-spark.wav";
+
+const LIBRARY_TRACKS = [
+  {
+    id: "tunetank-energetic-dance-pop",
+    name: "Energetic Dance Pop",
+    url: "/sample/library/tunetank-energetic-dance-pop.mp3",
+    meta: "30 sec · Tunetank",
+  },
+] as const;
 // 采样用的工作分辨率：96 列网格下每格约 4px，够均色用
 const PORTRAIT_SAMPLE_EDGE = 384;
 
@@ -60,7 +69,8 @@ export function PhotoBeatStudio() {
   const [photoReady, setPhotoReady] = useState(false);
   const [photoName, setPhotoName] = useState("");
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [audioMode, setAudioMode] = useState<"original" | "local">("original");
+  const [audioMode, setAudioMode] = useState<"original" | "library" | "local">("original");
+  const [libraryTrackId, setLibraryTrackId] = useState<string>(LIBRARY_TRACKS[0].id);
   const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
   const [localAudioName, setLocalAudioName] = useState("");
   const [audioReady, setAudioReady] = useState(false);
@@ -69,8 +79,19 @@ export function PhotoBeatStudio() {
   const [hasEntered, setHasEntered] = useState(false);
 
   const { resume, readFrame, reset } = useAudioBeats(audioRef);
-  const audioSource = audioMode === "original" ? ORIGINAL_AUDIO_URL : localAudioUrl;
-  const trackName = audioMode === "original" ? "Original Spark" : localAudioName || "Choose a local song";
+  const activeLibraryTrack = LIBRARY_TRACKS.find((track) => track.id === libraryTrackId);
+  const audioSource =
+    audioMode === "original"
+      ? ORIGINAL_AUDIO_URL
+      : audioMode === "library"
+        ? (activeLibraryTrack?.url ?? null)
+        : localAudioUrl;
+  const trackName =
+    audioMode === "original"
+      ? "Original Spark"
+      : audioMode === "library"
+        ? (activeLibraryTrack?.name ?? "Choose a library track")
+        : localAudioName || "Choose a local song";
   const canPlay = Boolean(photoUrl && photoReady && audioSource && audioReady);
 
   const invalidatePlaybackAttempt = useCallback(() => {
@@ -181,6 +202,13 @@ export function PhotoBeatStudio() {
   const chooseOriginal = () => {
     invalidatePlaybackAttempt();
     setAudioMode("original");
+    setAudioError(null);
+  };
+
+  const chooseLibrary = (id: string) => {
+    invalidatePlaybackAttempt();
+    setLibraryTrackId(id);
+    setAudioMode("library");
     setAudioError(null);
   };
 
@@ -349,13 +377,30 @@ export function PhotoBeatStudio() {
               <span className="track-option__number">01</span>
               <span><strong>Original Spark</strong><small>15 sec · 132 BPM</small></span>
             </button>
+            {LIBRARY_TRACKS.map((track, index) => (
+              <button
+                key={track.id}
+                type="button"
+                className={cn(
+                  "track-option",
+                  audioMode === "library" && libraryTrackId === track.id && "is-active",
+                )}
+                aria-pressed={audioMode === "library" && libraryTrackId === track.id}
+                onClick={() => chooseLibrary(track.id)}
+              >
+                <span className="track-option__number">{String(index + 2).padStart(2, "0")}</span>
+                <span><strong>{track.name}</strong><small>{track.meta}</small></span>
+              </button>
+            ))}
             <button
               type="button"
               className={cn("track-option", audioMode === "local" && "is-active")}
               aria-pressed={audioMode === "local"}
               onClick={chooseLocal}
             >
-              <span className="track-option__number">02</span>
+              <span className="track-option__number">
+                {String(LIBRARY_TRACKS.length + 2).padStart(2, "0")}
+              </span>
               <span><strong>Your Song</strong><small>Local audio only</small></span>
             </button>
           </div>
